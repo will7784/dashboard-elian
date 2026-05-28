@@ -104,8 +104,49 @@ ensure_db()
 
 
 @app.context_processor
-def inject_now():
-    return {'now': datetime.now().strftime('%d/%m/%Y')}
+def inject_globals():
+    """Inyecta variables globales a todos los templates: fecha de corte basada en los datos reales."""
+    conn = get_db()
+    cur = conn.cursor()
+    
+    # Fecha de corte: última fecha_firma_contrato o fecha_recepcion disponible en los datos
+    ultima_fecha = cur.execute(
+        "SELECT MAX(COALESCE(fecha_firma_contrato, fecha_recepcion)) FROM hechos_requisicion"
+    ).fetchone()[0]
+    
+    # Rango de fechas de los datos
+    min_fecha = cur.execute("SELECT MIN(fecha_recepcion) FROM hechos_requisicion").fetchone()[0]
+    max_fecha = cur.execute("SELECT MAX(fecha_recepcion) FROM hechos_requisicion").fetchone()[0]
+    conn.close()
+    
+    corte_str = 'Sin datos'
+    rango_str = ''
+    
+    if ultima_fecha:
+        try:
+            fecha_corte = datetime.strptime(str(ultima_fecha), '%Y-%m-%d')
+            corte_str = fecha_corte.strftime('%d/%m/%Y')
+        except ValueError:
+            corte_str = str(ultima_fecha)
+    
+    if min_fecha and max_fecha:
+        try:
+            f_min = datetime.strptime(str(min_fecha), '%Y-%m-%d')
+            f_max = datetime.strptime(str(max_fecha), '%Y-%m-%d')
+            mismo_anio = f_min.year == f_max.year
+            if mismo_anio:
+                rango_str = f"{f_min.strftime('%b')} – {f_max.strftime('%b %Y')}"
+            else:
+                rango_str = f"{f_min.strftime('%b %Y')} – {f_max.strftime('%b %Y')}"
+        except ValueError:
+            rango_str = f"{min_fecha} a {max_fecha}"
+    
+    return {
+        'now': datetime.now().strftime('%d/%m/%Y'),
+        'corte_fecha': corte_str,
+        'corte_rango': rango_str,
+        'corte_anio': datetime.now().year
+    }
 
 
 @app.route('/')

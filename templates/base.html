@@ -47,8 +47,8 @@
             <header class="topbar">
                 <h1 class="page-title">{% block page_title %}Dashboard{% endblock %}</h1>
                 <div class="topbar-meta">
-                    <span class="badge">Corte: 2026</span>
-                    <span class="badge outline">{{ now if now else 'Actualizado hoy' }}</span>
+                    <span class="badge" title="Período cubierto por los datos">{{ corte_rango if corte_rango else 'Corte: ' ~ corte_anio }}</span>
+                    <span class="badge outline" title="Fecha del último registro">Corte: {{ corte_fecha if corte_fecha else now }}</span>
                 </div>
             </header>
             <div class="content-wrapper">
