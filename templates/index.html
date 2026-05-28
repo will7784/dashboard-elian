@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Resumen Ejecutivo | Dashboard KPI{% endblock %}
+{% block page_title %}Dashboard Indicadores de Selección y Contratación{% endblock %}
+{% block content %}
+
+<section class="kpi-grid">
+    <div class="kpi-card gradient-1">
+        <div class="kpi-label">Total Requisiciones</div>
+        <div class="kpi-value">{{ total_requis }}</div>
+        <div class="kpi-sub">Registros en el período</div>
+    </div>
+    <div class="kpi-card gradient-2">
+        <div class="kpi-label">Tasa de Cierre</div>
+        <div class="kpi-value">{{ tasa_cierre }}%</div>
+        <div class="kpi-sub">{{ contratados }} llegaron a contratación</div>
+    </div>
+    <div class="kpi-card gradient-3">
+        <div class="kpi-label">Time to Fill Prom.</div>
+        <div class="kpi-value">{{ ttf }}</div>
+        <div class="kpi-sub">Días promedio</div>
+    </div>
+    <div class="kpi-card gradient-4">
+        <div class="kpi-label">Efectividad Reclut.</div>
+        <div class="kpi-value">{{ efec }}%</div>
+        <div class="kpi-sub">Candidatos aptos</div>
+    </div>
+</section>
+
+<section class="section-grid two-col">
+    <div class="card">
+        <div class="card-header">
+            <h2>Embudo de Conversión</h2>
+            <span class="card-badge">Promedio por Requisición</span>
+        </div>
+        <div class="funnel-wrapper">
+            {% for etapa, valor, pct in zip(embudo.etapas, embudo.valores, embudo.porcentajes) %}
+            <div class="funnel-step" style="width: {{ max(22, 100 - loop.index0*18) }}%">
+                <div class="funnel-bar">
+                    <span class="funnel-name">{{ etapa }}</span>
+                    <span class="funnel-val">{{ valor }} <small>({{ pct }}%)</small></span>
+                </div>
+                {% if not loop.last %}
+                <div class="funnel-arrow">&#9660;</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        <div class="funnel-meta">
+            <div class="meta-item"><strong>{{ embudo.valores[0] }}</strong> HV presentadas<br><small>100% base</small></div>
+            <div class="meta-item"><strong>{{ embudo.valores[1] }}</strong> Evaluadas<br><small>{{ embudo.porcentajes[1] }}% conversión</small></div>
+            <div class="meta-item"><strong>{{ embudo.valores[2] }}</strong> Informes<br><small>{{ embudo.porcentajes[2] }}% conversión</small></div>
+            <div class="meta-item"><strong>{{ embudo.valores[3] }}</strong> Contratados<br><small>{{ embudo.porcentajes[3] }}% conversión</small></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2>Recuento por Mes</h2>
+        </div>
+        {% if graph_mes %}
+        {{ graph_mes | safe }}
+        {% else %}
+        <div class="empty-state">Sin datos de fechas disponibles</div>
+        {% endif %}
+    </div>
+</section>
+
+<section class="section-grid two-col">
+    <div class="card">
+        <div class="card-header">
+            <h2>Estados de Requisición</h2>
+            <span class="card-badge">Causas de Quiebre</span>
+        </div>
+        {{ graph_estados | safe }}
+    </div>
+    <div class="card">
+        <div class="card-header">
+            <h2>Distribución Regional</h2>
+        </div>
+        {{ graph_reg | safe }}
+    </div>
+</section>
+
+<section class="section-grid two-col">
+    <div class="card">
+        <div class="card-header">
+            <h2>Time to Fill por Empresa</h2>
+            <span class="card-badge">Top 15</span>
+        </div>
+        {{ graph_ttf | safe }}
+    </div>
+    <div class="card">
+        <div class="card-header">
+            <h2>Requisiciones por Empresa</h2>
+        </div>
+        {{ graph_emp | safe }}
+    </div>
+</section>
+
+{% endblock %}

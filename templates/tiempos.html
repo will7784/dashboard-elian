@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Tiempos por Etapa | Dashboard KPI{% endblock %}
+{% block page_title %}Tiempos por Etapa (SyC){% endblock %}
+{% block content %}
+
+<section class="kpi-grid four-col">
+    <div class="kpi-card solid-1">
+        <div class="kpi-label">Oportunidad Reclutamiento</div>
+        <div class="kpi-value">{{ promedios.reclutamiento }}</div>
+        <div class="kpi-sub">Días promedio</div>
+    </div>
+    <div class="kpi-card solid-2">
+        <div class="kpi-label">Oportunidad Selección</div>
+        <div class="kpi-value">{{ promedios.seleccion }}</div>
+        <div class="kpi-sub">Días promedio</div>
+    </div>
+    <div class="kpi-card solid-3">
+        <div class="kpi-label">Oportunidad Contratación</div>
+        <div class="kpi-value">{{ promedios.contratacion }}</div>
+        <div class="kpi-sub">Días promedio</div>
+    </div>
+    <div class="kpi-card solid-4">
+        <div class="kpi-label">Tiempo Total Proceso</div>
+        <div class="kpi-value">{{ promedios.total }}</div>
+        <div class="kpi-sub">Días promedio</div>
+    </div>
+</section>
+
+<section class="section-grid two-col">
+    <div class="card">
+        <div class="card-header">
+            <h2>Evolución de Tiempos por Mes</h2>
+        </div>
+        {% if graph_ind %}
+        {{ graph_ind | safe }}
+        {% else %}
+        <div class="empty-state">Sin datos temporales</div>
+        {% endif %}
+    </div>
+    <div class="card">
+        <div class="card-header">
+            <h2>Distribución Time to Fill por Empresa</h2>
+        </div>
+        {{ graph_box | safe }}
+    </div>
+</section>
+
+<section class="section-grid">
+    <div class="card">
+        <div class="card-header">
+            <h2>Indicadores por Empresa</h2>
+        </div>
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Empresa</th>
+                        <th>Requis</th>
+                        <th>Rec. (días)</th>
+                        <th>Sel. (días)</th>
+                        <th>Cont. (días)</th>
+                        <th>TTP (días)</th>
+                        <th>Efectividad</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in tabla %}
+                    <tr>
+                        <td>{{ row.empresa }}</td>
+                        <td>{{ row.total }}</td>
+                        <td>{{ row.rec }}</td>
+                        <td>{{ row.sel }}</td>
+                        <td>{{ row.cont }}</td>
+                        <td><strong>{{ row.ttp }}</strong></td>
+                        <td><span class="tag {% if row.efec >= 80 %}tag-green{% elif row.efec >= 50 %}tag-yellow{% else %}tag-red{% endif %}">{{ row.efec }}%</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+{% endblock %}

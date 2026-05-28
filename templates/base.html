@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Dashboard KPI Reclutamiento{% endblock %}</title>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <span class="logo-icon">&#9670;</span>
+                    <span class="logo-text">COE Talento<br><small>Humano</small></span>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="/" class="nav-item {% if request.path == '/' %}active{% endif %}">
+                    <span class="nav-icon">&#9733;</span>
+                    <span>Resumen Ejecutivo</span>
+                </a>
+                <a href="/tiempos" class="nav-item {% if request.path == '/tiempos' %}active{% endif %}">
+                    <span class="nav-icon">&#9202;</span>
+                    <span>Tiempos por Etapa</span>
+                </a>
+                <a href="/psicologos" class="nav-item {% if request.path == '/psicologos' %}active{% endif %}">
+                    <span class="nav-icon">&#9786;</span>
+                    <span>Productividad Psicólogos</span>
+                </a>
+                <a href="/fuentes" class="nav-item {% if request.path == '/fuentes' %}active{% endif %}">
+                    <span class="nav-icon">&#9733;</span>
+                    <span>Fuentes de Reclutamiento</span>
+                </a>
+                <a href="/detalle" class="nav-item {% if request.path == '/detalle' %}active{% endif %}">
+                    <span class="nav-icon">&#9638;</span>
+                    <span>Detalle & Mapa de Calor</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <small>Dashboard Indicadores de Selección y Contratación</small>
+            </div>
+        </aside>
+        <main class="main-content">
+            <header class="topbar">
+                <h1 class="page-title">{% block page_title %}Dashboard{% endblock %}</h1>
+                <div class="topbar-meta">
+                    <span class="badge">Corte: 2026</span>
+                    <span class="badge outline">{{ now if now else 'Actualizado hoy' }}</span>
+                </div>
+            </header>
+            <div class="content-wrapper">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+</body>
+</html>

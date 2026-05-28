@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Productividad Psicólogos | Dashboard KPI{% endblock %}
+{% block page_title %}Productividad Psicólogos{% endblock %}
+{% block content %}
+
+<section class="section-grid two-col">
+    <div class="card">
+        <div class="card-header">
+            <h2>Requisiciones por Psicólogo</h2>
+        </div>
+        {{ graph_prod | safe }}
+    </div>
+    <div class="card">
+        <div class="card-header">
+            <h2>Efectividad vs Time to Fill</h2>
+        </div>
+        {{ graph_scatter | safe }}
+    </div>
+</section>
+
+<section class="section-grid">
+    <div class="card">
+        <div class="card-header">
+            <h2>Detalle por Psicólogo</h2>
+        </div>
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Psicólogo</th>
+                        <th>Requisiciones</th>
+                        <th>Efectividad</th>
+                        <th>Time to Fill</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in prod %}
+                    <tr>
+                        <td>{{ row.psicologo }}</td>
+                        <td>{{ row.total }}</td>
+                        <td><span class="tag {% if row.efec >= 80 %}tag-green{% elif row.efec >= 50 %}tag-yellow{% else %}tag-red{% endif %}">{{ row.efec }}%</span></td>
+                        <td>{{ row.ttp }} días</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+{% endblock %}

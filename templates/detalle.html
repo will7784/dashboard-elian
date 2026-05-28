@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Detalle & Mapa de Calor | Dashboard KPI{% endblock %}
+{% block page_title %}Detalle y Mapa de Calor{% endblock %}
+{% block content %}
+
+<section class="section-grid">
+    <div class="card">
+        <div class="card-header">
+            <h2>Mapa de Calor: Empresa vs Mes</h2>
+        </div>
+        {% if graph_heat %}
+        {{ graph_heat | safe }}
+        {% else %}
+        <div class="empty-state">Sin datos de calendario para heatmap</div>
+        {% endif %}
+    </div>
+</section>
+
+<section class="section-grid">
+    <div class="card">
+        <div class="card-header">
+            <h2>Detalle de Requisiciones</h2>
+            <span class="card-badge">Top 200</span>
+        </div>
+        <div class="table-wrapper">
+            <table class="data-table compact">
+                <thead>
+                    <tr>
+                        <th># Req</th>
+                        <th>Empresa</th>
+                        <th>Regional</th>
+                        <th>Cargo</th>
+                        <th>Tipo</th>
+                        <th>Servicio</th>
+                        <th>Psicólogo</th>
+                        <th>Fuente</th>
+                        <th>Estado</th>
+                        <th>Efect.</th>
+                        <th>TTP</th>
+                        <th>Fecha Cierre</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in data %}
+                    <tr>
+                        <td>{{ row.numero_requisicion }}</td>
+                        <td>{{ row.empresa }}</td>
+                        <td>{{ row.regional }}</td>
+                        <td>{{ row.cargo }}</td>
+                        <td>{{ row.tipo_cargo }}</td>
+                        <td>{{ row.tipo_servicio }}</td>
+                        <td>{{ row.psicologo or '-' }}</td>
+                        <td>{{ row.fuente or '-' }}</td>
+                        <td><span class="tag {% if 'contratacion' in row.estado_requisicion %}tag-green{% else %}tag-yellow{% endif %}">{{ row.estado_requisicion }}</span></td>
+                        <td>{{ "%.0f"|format((row.efectividad_reclutamiento or 0)*100) }}%</td>
+                        <td>{{ row.tiempo_total_proceso or '-' }}</td>
+                        <td>{{ row.fecha_firma_contrato or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+{% endblock %}

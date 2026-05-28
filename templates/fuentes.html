@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Fuentes de Reclutamiento | Dashboard KPI{% endblock %}
+{% block page_title %}Fuentes de Reclutamiento{% endblock %}
+{% block content %}
+
+<section class="section-grid two-col">
+    <div class="card">
+        <div class="card-header">
+            <h2>Volumen por Fuente</h2>
+        </div>
+        {{ graph_fuentes | safe }}
+    </div>
+    <div class="card">
+        <div class="card-header">
+            <h2>Treemap de Fuentes</h2>
+        </div>
+        {{ graph_tree | safe }}
+    </div>
+</section>
+
+<section class="section-grid">
+    <div class="card">
+        <div class="card-header">
+            <h2>Ranking de Fuentes</h2>
+        </div>
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Fuente</th>
+                        <th>Requisiciones</th>
+                        <th>Efectividad</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in fuentes %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ row.fuente }}</td>
+                        <td>{{ row.total }}</td>
+                        <td><span class="tag {% if row.efec >= 80 %}tag-green{% elif row.efec >= 50 %}tag-yellow{% else %}tag-red{% endif %}">{{ row.efec }}%</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+{% endblock %}
