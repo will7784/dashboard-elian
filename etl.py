@@ -3,8 +3,8 @@ import sqlite3
 import os
 from datetime import datetime
 
-DB_PATH = os.environ.get('DATABASE_PATH', os.path.join(os.path.dirname(__file__), 'database.db'))
-EXCEL_PATH = os.environ.get('EXCEL_PATH', os.path.join(os.path.dirname(__file__), 'data', 'Indicadores 2026.xlsx'))
+DB_PATH = os.environ.get('DATABASE_PATH', os.path.join(os.path.dirname(__file__), 'database.db')).strip()
+EXCEL_PATH = os.environ.get('EXCEL_PATH', os.path.join(os.path.dirname(__file__), 'data', 'Indicadores 2026.xlsx')).strip()
 
 # Mapeo por índice de columna para evitar problemas de encoding
 COLUMN_NAMES = [
@@ -62,6 +62,8 @@ def parse_int(val):
         return None
 
 def run_etl():
+    if not os.path.exists(EXCEL_PATH):
+        raise FileNotFoundError(f'No se encontró el archivo Excel: {EXCEL_PATH} (abs: {os.path.abspath(EXCEL_PATH)})')
     print('Leyendo Excel...')
     xl = pd.ExcelFile(EXCEL_PATH)
     df = pd.read_excel(xl, sheet_name='Requisiciones')
