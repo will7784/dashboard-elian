@@ -48,7 +48,10 @@
                 <h1 class="page-title">{% block page_title %}Dashboard{% endblock %}</h1>
                 <div class="topbar-meta">
                     <span class="badge" title="Período cubierto por los datos">{{ corte_rango if corte_rango else 'Corte: ' ~ corte_anio }}</span>
-                    <span class="badge outline" title="Fecha del último registro">Corte: {{ corte_fecha if corte_fecha else now }}</span>
+                    <form method="POST" action="/set_corte" class="corte-form" style="display:inline-flex;align-items:center;gap:6px;">
+                        <input type="date" name="fecha_corte" value="{{ fecha_corte_input }}" class="corte-input" style="background:#1e293b;border:1px solid #334155;color:#e2e8f0;padding:4px 8px;border-radius:6px;font-size:13px;font-family:Inter,sans-serif;">
+                        <button type="submit" class="corte-btn" style="background:#0ea5e9;border:none;color:#fff;padding:4px 10px;border-radius:6px;font-size:12px;cursor:pointer;">Aplicar</button>
+                    </form>
                 </div>
             </header>
             <div class="content-wrapper">

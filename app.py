@@ -4,7 +4,7 @@ import json
 import base64
 import struct
 from datetime import datetime
-from flask import Flask, render_template
+from flask import Flask, render_template, request, session, redirect, url_for
 import plotly.express as px
 import plotly.graph_objects as go
 import plotly.io as pio
@@ -13,11 +13,12 @@ import plotly.io as pio
 pio.json.config.default = 'json'
 
 app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-cambiar-en-produccion')
 
 # Railway monta el volumen en /data por convencion.
 # En local usamos la carpeta del proyecto.
-DB_PATH = os.environ.get('DATABASE_PATH', os.path.join(os.path.dirname(__file__), 'database.db'))
-EXCEL_PATH = os.path.join(os.path.dirname(__file__), '..', 'Indicadores 2026.xlsx')
+DB_PATH = os.environ.get('DATABASE_PATH', os.path.join(os.path.dirname(__file__), 'database.db')).strip()
+EXCEL_PATH = os.path.join(os.path.dirname(__file__), 'data', 'Indicadores 2026.xlsx')
 
 
 def ensure_db():
@@ -37,6 +38,16 @@ def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def get_fecha_corte():
+    """Devuelve la fecha de corte seleccionada por el usuario o la máxima de la DB."""
+    if 'fecha_corte' in session:
+        return session['fecha_corte']
+    conn = get_db()
+    max_fecha = conn.execute("SELECT MAX(fecha_recepcion) FROM hechos_requisicion").fetchone()[0]
+    conn.close()
+    return str(max_fecha) if max_fecha else datetime.now().strftime('%Y-%m-%d')
 
 
 def query_to_df(query, params=()):
@@ -103,32 +114,41 @@ def apply_dark_theme(fig):
 ensure_db()
 
 
+@app.route('/set_corte', methods=['POST'])
+def set_corte():
+    fecha = request.form.get('fecha_corte', '')
+    try:
+        datetime.strptime(fecha, '%Y-%m-%d')
+        session['fecha_corte'] = fecha
+    except ValueError:
+        session.pop('fecha_corte', None)
+    return redirect(request.referrer or url_for('index'))
+
+
 @app.context_processor
 def inject_globals():
-    """Inyecta variables globales a todos los templates: fecha de corte basada en los datos reales."""
+    """Inyecta variables globales a todos los templates."""
+    fecha_corte = get_fecha_corte()
+    
     conn = get_db()
     cur = conn.cursor()
     
-    # Fecha de corte: última fecha_firma_contrato o fecha_recepcion disponible en los datos
-    ultima_fecha = cur.execute(
-        "SELECT MAX(COALESCE(fecha_firma_contrato, fecha_recepcion)) FROM hechos_requisicion"
+    # Rango de fechas de los datos (hasta la fecha de corte)
+    min_fecha = cur.execute(
+        "SELECT MIN(fecha_recepcion) FROM hechos_requisicion WHERE fecha_recepcion <= ?", [fecha_corte]
     ).fetchone()[0]
-    
-    # Rango de fechas de los datos
-    min_fecha = cur.execute("SELECT MIN(fecha_recepcion) FROM hechos_requisicion").fetchone()[0]
-    max_fecha = cur.execute("SELECT MAX(fecha_recepcion) FROM hechos_requisicion").fetchone()[0]
+    max_fecha = cur.execute(
+        "SELECT MAX(fecha_recepcion) FROM hechos_requisicion WHERE fecha_recepcion <= ?", [fecha_corte]
+    ).fetchone()[0]
     conn.close()
     
-    corte_str = 'Sin datos'
+    corte_str = fecha_corte
+    try:
+        corte_str = datetime.strptime(str(fecha_corte), '%Y-%m-%d').strftime('%d/%m/%Y')
+    except ValueError:
+        pass
+    
     rango_str = ''
-    
-    if ultima_fecha:
-        try:
-            fecha_corte = datetime.strptime(str(ultima_fecha), '%Y-%m-%d')
-            corte_str = fecha_corte.strftime('%d/%m/%Y')
-        except ValueError:
-            corte_str = str(ultima_fecha)
-    
     if min_fecha and max_fecha:
         try:
             f_min = datetime.strptime(str(min_fecha), '%Y-%m-%d')
@@ -145,25 +165,27 @@ def inject_globals():
         'now': datetime.now().strftime('%d/%m/%Y'),
         'corte_fecha': corte_str,
         'corte_rango': rango_str,
-        'corte_anio': datetime.now().year
+        'corte_anio': datetime.now().year,
+        'fecha_corte_input': fecha_corte
     }
 
 
 @app.route('/')
 def index():
+    fecha_corte = get_fecha_corte()
     conn = get_db()
     cur = conn.cursor()
 
-    total_requis = cur.execute('SELECT COUNT(*) FROM hechos_requisicion').fetchone()[0]
+    total_requis = cur.execute('SELECT COUNT(*) FROM hechos_requisicion WHERE fecha_recepcion <= ?', [fecha_corte]).fetchone()[0]
     contratados = cur.execute(
-        "SELECT COUNT(*) FROM hechos_requisicion WHERE estado_requisicion = 'Finalizado - Llego hasta contratacion'"
+        "SELECT COUNT(*) FROM hechos_requisicion WHERE estado_requisicion = 'Finalizado - Llego hasta contratacion' AND fecha_recepcion <= ?", [fecha_corte]
     ).fetchone()[0]
     tasa_cierre = round((contratados / total_requis * 100), 1) if total_requis else 0
 
-    ttf = cur.execute('SELECT AVG(tiempo_total_proceso) FROM hechos_requisicion WHERE tiempo_total_proceso IS NOT NULL').fetchone()[0]
+    ttf = cur.execute('SELECT AVG(tiempo_total_proceso) FROM hechos_requisicion WHERE tiempo_total_proceso IS NOT NULL AND fecha_recepcion <= ?', [fecha_corte]).fetchone()[0]
     ttf = round(ttf, 1) if ttf else 0
 
-    efec = cur.execute('SELECT AVG(efectividad_reclutamiento) FROM hechos_requisicion WHERE efectividad_reclutamiento IS NOT NULL').fetchone()[0]
+    efec = cur.execute('SELECT AVG(efectividad_reclutamiento) FROM hechos_requisicion WHERE efectividad_reclutamiento IS NOT NULL AND fecha_recepcion <= ?', [fecha_corte]).fetchone()[0]
     efec = round(efec * 100, 1) if efec else 0
 
     embudo = cur.execute('''
@@ -173,7 +195,8 @@ def index():
             AVG(informes_entregados) as informes,
             AVG(CASE WHEN estado_requisicion = 'Finalizado - Llego hasta contratacion' THEN 1.0 ELSE 0.0 END) as contratados
         FROM hechos_requisicion
-    ''').fetchone()
+        WHERE fecha_recepcion <= ?
+    ''', [fecha_corte]).fetchone()
     base = embudo['hv_presentadas'] or 1
     vals = [
         round(embudo['hv_presentadas'] or 0, 1),
@@ -191,9 +214,10 @@ def index():
     estados = query_to_df('''
         SELECT estado_requisicion as estado, COUNT(*) as total
         FROM hechos_requisicion
+        WHERE fecha_recepcion <= ?
         GROUP BY estado_requisicion
         ORDER BY total DESC
-    ''')
+    ''', [fecha_corte])
     fig_estados = px.bar(
         estados, x='estado', y='total', text='total',
         color='estado', color_discrete_sequence=['#22c55e', '#ef4444'],
@@ -207,11 +231,11 @@ def index():
         SELECT e.empresa, COUNT(*) as requis, AVG(h.tiempo_total_proceso) as ttf
         FROM hechos_requisicion h
         JOIN dim_empresa e ON h.fk_empresa = e.id
-        WHERE h.tiempo_total_proceso IS NOT NULL
+        WHERE h.tiempo_total_proceso IS NOT NULL AND h.fecha_recepcion <= ?
         GROUP BY e.empresa
         ORDER BY requis DESC
         LIMIT 15
-    ''')
+    ''', [fecha_corte])
     fig_ttf = px.bar(
         ttf_empresa, x='empresa', y='ttf', text='ttf',
         labels={'empresa': 'Empresa', 'ttf': 'Días Promedio'},
@@ -225,9 +249,10 @@ def index():
         SELECT c.anio, c.mes, c.nombre_mes, COUNT(*) as total
         FROM hechos_requisicion h
         JOIN dim_calendario c ON h.fk_calendario = c.id
+        WHERE h.fecha_recepcion <= ?
         GROUP BY c.anio, c.mes, c.nombre_mes
         ORDER BY c.anio, c.mes
-    ''')
+    ''', [fecha_corte])
     if meses:
         meses_labels = [f"{m['nombre_mes'][:3]} {m['anio']}" for m in meses]
         meses_vals = [m['total'] for m in meses]
@@ -246,10 +271,11 @@ def index():
         SELECT e.empresa, COUNT(*) as total
         FROM hechos_requisicion h
         JOIN dim_empresa e ON h.fk_empresa = e.id
+        WHERE h.fecha_recepcion <= ?
         GROUP BY e.empresa
         ORDER BY total DESC
         LIMIT 12
-    ''')
+    ''', [fecha_corte])
     fig_emp = px.bar(
         emp_data, y='empresa', x='total', orientation='h',
         color='total', color_continuous_scale='Blues',
@@ -262,10 +288,10 @@ def index():
         SELECT e.regional, COUNT(*) as total
         FROM hechos_requisicion h
         JOIN dim_empresa e ON h.fk_empresa = e.id
-        WHERE e.regional IS NOT NULL
+        WHERE e.regional IS NOT NULL AND h.fecha_recepcion <= ?
         GROUP BY e.regional
         ORDER BY total DESC
-    ''')
+    ''', [fecha_corte])
     fig_reg = px.pie(reg_data, names='regional', values='total', hole=0.5,
                      color_discrete_sequence=px.colors.sequential.Teal)
     fig_reg = apply_dark_theme(fig_reg)
@@ -290,6 +316,7 @@ def index():
 
 @app.route('/tiempos')
 def tiempos():
+    fecha_corte = get_fecha_corte()
     conn = get_db()
     cur = conn.cursor()
 
@@ -300,7 +327,8 @@ def tiempos():
             AVG(oportunidad_contratacion) as cont,
             AVG(tiempo_total_proceso) as ttp
         FROM hechos_requisicion
-    ''').fetchone()
+        WHERE fecha_recepcion <= ?
+    ''', [fecha_corte]).fetchone()
 
     promedios = {
         'reclutamiento': round(proms['rec'] or 0, 1),
@@ -313,8 +341,8 @@ def tiempos():
         SELECT e.empresa, h.tiempo_total_proceso as ttp
         FROM hechos_requisicion h
         JOIN dim_empresa e ON h.fk_empresa = e.id
-        WHERE h.tiempo_total_proceso IS NOT NULL
-    ''')
+        WHERE h.tiempo_total_proceso IS NOT NULL AND h.fecha_recepcion <= ?
+    ''', [fecha_corte])
     df_box = {}
     for row in box_data:
         df_box.setdefault(row['empresa'], []).append(row['ttp'])
@@ -337,9 +365,10 @@ def tiempos():
             AVG(h.tiempo_total_proceso) as ttp
         FROM hechos_requisicion h
         JOIN dim_calendario c ON h.fk_calendario = c.id
+        WHERE h.fecha_recepcion <= ?
         GROUP BY c.anio, c.mes, c.nombre_mes
         ORDER BY c.anio, c.mes
-    ''')
+    ''', [fecha_corte])
     if ind_mes:
         labels = [f"{m['nombre_mes'][:3]} {m['anio']}" for m in ind_mes]
         fig_ind = go.Figure()
@@ -367,10 +396,11 @@ def tiempos():
             ROUND(AVG(h.efectividad_reclutamiento)*100,1) as efec
         FROM hechos_requisicion h
         JOIN dim_empresa e ON h.fk_empresa = e.id
+        WHERE h.fecha_recepcion <= ?
         GROUP BY e.empresa
         ORDER BY total DESC
         LIMIT 20
-    ''')
+    ''', [fecha_corte])
 
     conn.close()
     return render_template('tiempos.html',
@@ -382,6 +412,7 @@ def tiempos():
 
 @app.route('/psicologos')
 def psicologos():
+    fecha_corte = get_fecha_corte()
     conn = get_db()
     cur = conn.cursor()
 
@@ -391,9 +422,10 @@ def psicologos():
             ROUND(AVG(h.tiempo_total_proceso),1) as ttp
         FROM hechos_requisicion h
         JOIN dim_psicologo p ON h.fk_psicologo = p.id
+        WHERE h.fecha_recepcion <= ?
         GROUP BY p.psicologo
         ORDER BY total DESC
-    ''')
+    ''', [fecha_corte])
 
     fig_prod = px.bar(
         prod, y='psicologo', x='total', orientation='h',
@@ -423,6 +455,7 @@ def psicologos():
 
 @app.route('/fuentes')
 def fuentes():
+    fecha_corte = get_fecha_corte()
     conn = get_db()
     cur = conn.cursor()
 
@@ -431,9 +464,10 @@ def fuentes():
             ROUND(AVG(h.efectividad_reclutamiento)*100,1) as efec
         FROM hechos_requisicion h
         JOIN dim_fuente f ON h.fk_fuente = f.id
+        WHERE h.fecha_recepcion <= ?
         GROUP BY f.fuente
         ORDER BY total DESC
-    ''')
+    ''', [fecha_corte])
 
     fig_fuentes = px.bar(
         fuentes_data, x='fuente', y='total',
@@ -462,6 +496,7 @@ def fuentes():
 
 @app.route('/detalle')
 def detalle():
+    fecha_corte = get_fecha_corte()
     conn = get_db()
     cur = conn.cursor()
 
@@ -481,17 +516,19 @@ def detalle():
         JOIN dim_cargo c ON h.fk_cargo = c.id
         LEFT JOIN dim_psicologo p ON h.fk_psicologo = p.id
         LEFT JOIN dim_fuente f ON h.fk_fuente = f.id
+        WHERE h.fecha_recepcion <= ?
         ORDER BY h.numero_requisicion DESC
         LIMIT 200
-    ''')
+    ''', [fecha_corte])
 
     heat = query_to_df('''
         SELECT e.empresa, c.nombre_mes, COUNT(*) as total
         FROM hechos_requisicion h
         JOIN dim_empresa e ON h.fk_empresa = e.id
         JOIN dim_calendario c ON h.fk_calendario = c.id
+        WHERE h.fecha_recepcion <= ?
         GROUP BY e.empresa, c.nombre_mes
-    ''')
+    ''', [fecha_corte])
     if heat:
         import pandas as pd
         dfh = pd.DataFrame(heat)
